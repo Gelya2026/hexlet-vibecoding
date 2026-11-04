@@ -117,6 +117,15 @@ hr{border:0;border-top:1px solid var(--line);margin:0}
 .macros strong{font-family:var(--f-mono);font-size:20px;font-weight:700;font-variant-numeric:tabular-nums}
 .macros small{color:var(--muted);font-size:12px}
 
+.water{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px 20px}
+.water-val{display:flex;flex-direction:column;gap:2px;min-width:0}
+.water-val strong{font-family:var(--f-mono);font-size:32px;font-weight:700;line-height:1.1;font-variant-numeric:tabular-nums}
+.water-val strong em{font-style:normal;font-size:14px;font-weight:500;color:var(--muted);margin-left:4px}
+.water-val small{color:var(--muted);font-size:12.5px;font-variant-numeric:tabular-nums}
+.glasses{display:flex;flex-wrap:wrap;gap:5px;max-width:100%}
+.glasses i{width:14px;height:20px;border:1.5px solid var(--c-low);border-top-width:0;border-radius:1px 1px 4px 4px;
+  background:linear-gradient(to top,var(--c-low) var(--f,100%),transparent 0);opacity:.9}
+
 .warn{background:var(--warn-bg);color:var(--warn-fg);border-radius:10px;padding:10px 14px;font-size:13.5px;margin:0}
 .note{color:var(--muted);font-size:12.5px;max-width:80ch;margin:0;line-height:1.55}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
@@ -208,10 +217,18 @@ hr{border:0;border-top:1px solid var(--line);margin:0}
         <div style="--sw:var(--c-over)"><b>Жиры</b><strong id="fat">64 г</strong><small id="fk"></small></div>
         <div style="--sw:var(--c-ok)"><b>Углеводы</b><strong id="c">220 г</strong><small id="ck"></small></div>
       </div>
+
+      <hr>
+
+      <div class="label">Вода в сутки</div>
+      <div class="water">
+        <div class="water-val"><strong id="water">2,4<em>л</em></strong><small id="water-note">30 мл × 72 кг + 250 мл за активность</small></div>
+        <div class="glasses" id="glasses" aria-label="Стаканы по 250 мл"></div>
+      </div>
     </section>
   </div>
 
-  <p class="note">Расчёт ориентировочный и подходит для взрослых 18+. ИМТ не различает мышцы и жир, поэтому у спортсменов с большой мышечной массой он завышен; для беременных, кормящих и подростков нужны другие нормы. Белок считается из расчёта 1,6 г на кг веса (1,8 г при снижении), жиры — 30 % калорийности, остальное — углеводы. Перед резкой сменой питания посоветуйтесь с врачом.</p>
+  <p class="note">Расчёт ориентировочный и подходит для взрослых 18+. ИМТ не различает мышцы и жир, поэтому у спортсменов с большой мышечной массой он завышен; для беременных, кормящих и подростков нужны другие нормы. Белок считается из расчёта 1,6 г на кг веса (1,8 г при снижении), жиры — 30 % калорийности, остальное — углеводы. Вода: 30 мл на кг веса плюс 250 мл за каждую ступень активности; в жару и при болезни нужно больше, при болезнях почек и сердца норму определяет врач. Перед резкой сменой питания посоветуйтесь с врачом.</p>
 </div>
 
 <script>
@@ -322,6 +339,20 @@ hr{border:0;border-top:1px solid var(--line);margin:0}
     $('ck').textContent = `${fmt(Math.round(cG*4))} ккал · ${Math.round(cG*4/tot*100)} %`;
     const m = $('mbar').children;
     m[0].style.flexGrow = pG*4; m[1].style.flexGrow = fG*9; m[2].style.flexGrow = cG*4;
+
+    const ACT_BONUS = {'1.2':0,'1.375':250,'1.55':500,'1.725':750,'1.9':1000};
+    const bonus = ACT_BONUS[form.act.value] ?? 0;
+    const waterMl = v.weight*30 + bonus;
+    $('water').innerHTML = fmt(waterMl/1000,1)+'<em>л</em>';
+    const glasses = waterMl/250;
+    $('water-note').textContent = `30 мл × ${fmt(v.weight,v.weight%1?1:0)} кг`
+      + (bonus ? ` + ${fmt(bonus)} мл за активность` : '')
+      + ` · около ${fmt(Math.round(glasses))} стаканов по 250 мл`;
+    const g = $('glasses'); g.textContent='';
+    for(let i=0;i<Math.ceil(glasses);i++){
+      const el=document.createElement('i');
+      const f=Math.min(1,glasses-i); el.style.setProperty('--f',(f*100)+'%'); g.appendChild(el);
+    }
   }
 
   form.addEventListener('input', calc);

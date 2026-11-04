@@ -1,0 +1,334 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ИМТ и норма калорий</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700&family=Golos+Text:wght@400;500;600&family=JetBrains+Mono:wght@500;700&display=swap">
+<style>
+/* Layout: two-column instrument panel — inputs on the left, live readout on the right; stacks on phones */
+:root{
+  --bg:#f3f5f1; --surface:#ffffff; --ink:#18211c; --muted:#5d6b63; --line:#dbe2dc;
+  --accent:#1f6b4f; --accent-soft:#e2efe8; --on-accent:#ffffff;
+  --c-low:#4a7fc1; --c-ok:#2f9a62; --c-over:#d9a521; --c-ob1:#e07a34; --c-ob2:#d4513a; --c-ob3:#a8324a;
+  --warn-bg:#fff4dc; --warn-fg:#7a5600;
+  --f-display:"Unbounded",system-ui,sans-serif;
+  --f-body:"Golos Text",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
+  --r:14px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#111613; --surface:#1a211d; --ink:#e7eee9; --muted:#97a69d; --line:#2c3630;
+  --accent:#5cc597; --accent-soft:#1f3329; --on-accent:#0d1711;
+  --c-low:#6fa3e6; --c-ok:#4cc085; --c-over:#e8bd45; --c-ob1:#f0934f; --c-ob2:#ec6a52; --c-ob3:#d0566e;
+  --warn-bg:#3a2f14; --warn-fg:#f1d58a; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#111613; --surface:#1a211d; --ink:#e7eee9; --muted:#97a69d; --line:#2c3630;
+  --accent:#5cc597; --accent-soft:#1f3329; --on-accent:#0d1711;
+  --c-low:#6fa3e6; --c-ok:#4cc085; --c-over:#e8bd45; --c-ob1:#f0934f; --c-ob2:#ec6a52; --c-ob3:#d0566e;
+  --warn-bg:#3a2f14; --warn-fg:#f1d58a; color-scheme:dark}
+
+*{box-sizing:border-box}
+body{margin:0}
+[hidden]{display:none!important}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.5}
+.wrap{max-width:1080px;margin:0 auto;padding-block:32px 48px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  display:flex;flex-direction:column;gap:24px}
+header{display:flex;flex-direction:column;gap:6px}
+h1{font-family:var(--f-display);font-weight:700;font-size:clamp(24px,4vw,34px);line-height:1.15;margin:0;text-wrap:balance;letter-spacing:-.01em}
+header p{margin:0;color:var(--muted);max-width:62ch}
+.grid{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:20px;align-items:start}
+@media (max-width:820px){.grid{grid-template-columns:minmax(0,1fr)}}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:22px;display:flex;flex-direction:column;gap:20px;min-width:0}
+.label{font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+fieldset{border:0;margin:0;padding:0;display:flex;flex-direction:column;gap:8px;min-width:0}
+legend{padding:0;margin-bottom:8px}
+
+/* segmented */
+.seg{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:3px;gap:3px}
+.seg input{position:absolute;opacity:0;pointer-events:none}
+.seg label{text-align:center;padding:8px 6px;border-radius:7px;cursor:pointer;font-weight:500;font-size:14px;color:var(--muted);transition:background .15s,color .15s}
+.seg input:checked+label{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgb(0 0 0 / .12)}
+.seg input:focus-visible+label{outline:2px solid var(--accent);outline-offset:1px}
+
+.nums{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.num{display:flex;flex-direction:column;gap:6px;min-width:0}
+.field{display:flex;align-items:baseline;border:1px solid var(--line);border-radius:10px;background:var(--bg);padding:0 10px;transition:border-color .15s}
+.field:focus-within{border-color:var(--accent);outline:2px solid var(--accent-soft)}
+.field input{flex:1;min-width:0;border:0;background:transparent;color:var(--ink);font-family:var(--f-mono);font-weight:500;font-size:20px;padding:9px 0;font-variant-numeric:tabular-nums;outline:none;-moz-appearance:textfield}
+.field input::-webkit-outer-spin-button,.field input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.field span{color:var(--muted);font-size:13px}
+.field.bad{border-color:var(--c-ob2)}
+
+.act{display:flex;flex-direction:column;gap:6px}
+.act input{position:absolute;opacity:0;pointer-events:none}
+.act label{display:grid;grid-template-columns:1fr auto;gap:2px 10px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;cursor:pointer;transition:border-color .15s,background .15s}
+.act label b{font-weight:600;font-size:14px}
+.act label small{grid-column:1;color:var(--muted);font-size:12.5px;line-height:1.35}
+.act label i{grid-row:1/3;grid-column:2;align-self:center;font-style:normal;font-family:var(--f-mono);font-size:13px;color:var(--muted)}
+.act input:checked+label{border-color:var(--accent);background:var(--accent-soft)}
+.act input:checked+label i{color:var(--accent)}
+.act input:focus-visible+label{outline:2px solid var(--accent);outline-offset:1px}
+
+.err{color:var(--c-ob2);font-size:13px;margin:0}
+
+/* results */
+.bmi-top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px}
+.big{font-family:var(--f-mono);font-weight:700;font-size:clamp(48px,8vw,64px);line-height:1;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.pill{display:inline-flex;align-items:center;gap:8px;padding:6px 12px;border-radius:999px;font-weight:600;font-size:14px;background:var(--bg);border:1px solid var(--line)}
+.pill::before{content:"";width:10px;height:10px;border-radius:50%;background:var(--dot,var(--muted))}
+
+.scale{position:relative;padding-top:22px}
+.bar{display:flex;height:12px;border-radius:6px;overflow:hidden}
+.bar div{height:100%}
+.marker{position:absolute;top:0;transform:translateX(-50%);transition:left .35s cubic-bezier(.3,.7,.3,1);display:flex;flex-direction:column;align-items:center}
+.marker::before{content:"";width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;border-top:9px solid var(--ink)}
+.marker::after{content:"";width:2px;height:22px;background:var(--ink);margin-top:-1px}
+.ticks{position:relative;height:18px;margin-top:6px;font-family:var(--f-mono);font-size:11.5px;color:var(--muted)}
+.ticks span{position:absolute;transform:translateX(-50%);font-variant-numeric:tabular-nums}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12.5px;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend span::before{content:"";width:9px;height:9px;border-radius:2px;background:var(--sw)}
+
+.facts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.facts div{background:var(--surface);padding:12px 14px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.facts strong{font-family:var(--f-mono);font-size:18px;font-weight:500;font-variant-numeric:tabular-nums}
+.facts small{color:var(--muted);font-size:12.5px}
+
+hr{border:0;border-top:1px solid var(--line);margin:0}
+
+.kcal{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+@media (max-width:480px){.kcal{grid-template-columns:minmax(0,1fr)}}
+.kc{border:1px solid var(--line);border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;gap:4px;min-width:0}
+.kc strong{font-family:var(--f-mono);font-size:24px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.1}
+.kc strong em{font-style:normal;font-size:13px;font-weight:500;color:var(--muted);margin-left:4px}
+.kc small{color:var(--muted);font-size:12.5px;line-height:1.35}
+.kc.target{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.kc.target .label,.kc.target small,.kc.target strong em{color:var(--on-accent);opacity:.85}
+
+.macro-bar{display:flex;height:10px;border-radius:5px;overflow:hidden;gap:2px}
+.macro-bar div{transition:flex-grow .3s}
+.macros{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.macros div{display:flex;flex-direction:column;gap:2px;min-width:0}
+.macros b{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:500;color:var(--muted)}
+.macros b::before{content:"";width:9px;height:9px;border-radius:2px;background:var(--sw)}
+.macros strong{font-family:var(--f-mono);font-size:20px;font-weight:700;font-variant-numeric:tabular-nums}
+.macros small{color:var(--muted);font-size:12px}
+
+.warn{background:var(--warn-bg);color:var(--warn-fg);border-radius:10px;padding:10px 14px;font-size:13.5px;margin:0}
+.note{color:var(--muted);font-size:12.5px;max-width:80ch;margin:0;line-height:1.55}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <h1>ИМТ и дневная норма калорий</h1>
+    <p>Индекс массы тела по шкале ВОЗ и суточная калорийность по формуле Миффлина — Сан Жеора. Результат пересчитывается сразу при вводе.</p>
+  </header>
+
+  <div class="grid">
+    <form class="panel" id="form" novalidate>
+      <fieldset>
+        <legend class="label">Пол</legend>
+        <div class="seg">
+          <input type="radio" name="sex" id="sex-f" value="f" checked><label for="sex-f">Женский</label>
+          <input type="radio" name="sex" id="sex-m" value="m"><label for="sex-m">Мужской</label>
+        </div>
+      </fieldset>
+
+      <div class="nums">
+        <div class="num"><label class="label" for="age">Возраст</label>
+          <div class="field" id="f-age"><input id="age" type="number" inputmode="numeric" min="18" max="100" value="32"><span>лет</span></div></div>
+        <div class="num"><label class="label" for="height">Рост</label>
+          <div class="field" id="f-height"><input id="height" type="number" inputmode="decimal" min="120" max="230" value="168"><span>см</span></div></div>
+        <div class="num"><label class="label" for="weight">Вес</label>
+          <div class="field" id="f-weight"><input id="weight" type="number" inputmode="decimal" min="30" max="300" step="0.1" value="72"><span>кг</span></div></div>
+      </div>
+      <p class="err" id="err" hidden></p>
+
+      <fieldset>
+        <legend class="label">Физическая активность</legend>
+        <div class="act">
+          <input type="radio" name="act" id="a1" value="1.2"><label for="a1"><b>Минимальная</b><small>Сидячая работа, почти без тренировок</small><i>×1,2</i></label>
+          <input type="radio" name="act" id="a2" value="1.375" checked><label for="a2"><b>Низкая</b><small>Лёгкие тренировки или прогулки 1–3 раза в неделю</small><i>×1,375</i></label>
+          <input type="radio" name="act" id="a3" value="1.55"><label for="a3"><b>Средняя</b><small>Тренировки 3–5 раз в неделю</small><i>×1,55</i></label>
+          <input type="radio" name="act" id="a4" value="1.725"><label for="a4"><b>Высокая</b><small>Интенсивные тренировки 6–7 раз в неделю</small><i>×1,725</i></label>
+          <input type="radio" name="act" id="a5" value="1.9"><label for="a5"><b>Очень высокая</b><small>Физическая работа плюс ежедневный спорт</small><i>×1,9</i></label>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend class="label">Цель</legend>
+        <div class="seg">
+          <input type="radio" name="goal" id="g-lose" value="-0.15"><label for="g-lose">Снижение</label>
+          <input type="radio" name="goal" id="g-keep" value="0" checked><label for="g-keep">Поддержание</label>
+          <input type="radio" name="goal" id="g-gain" value="0.1"><label for="g-gain">Набор</label>
+        </div>
+      </fieldset>
+    </form>
+
+    <section class="panel" aria-live="polite">
+      <div class="label">Индекс массы тела</div>
+      <div class="bmi-top">
+        <div class="big" id="bmi">25,5</div>
+        <div class="pill" id="cat">Избыточный вес</div>
+      </div>
+      <div class="scale">
+        <div class="marker" id="marker" style="left:50%"></div>
+        <div class="bar" id="bar"></div>
+        <div class="ticks" id="ticks"></div>
+      </div>
+      <div class="legend" id="legend"></div>
+
+      <div class="facts">
+        <div><small>Нормальный вес при вашем росте</small><strong id="range">52,2–70,3 кг</strong></div>
+        <div><small>До границы нормы</small><strong id="delta">−1,7 кг</strong></div>
+      </div>
+
+      <hr>
+
+      <div class="label">Калории в сутки</div>
+      <div class="kcal">
+        <div class="kc"><span class="label">Базовый обмен</span><strong id="bmr">1 404<em>ккал</em></strong><small>Расход в полном покое</small></div>
+        <div class="kc"><span class="label">Поддержание</span><strong id="tdee">1 930<em>ккал</em></strong><small>С учётом активности</small></div>
+        <div class="kc target"><span class="label">Ваша норма</span><strong id="target">1 930<em>ккал</em></strong><small id="target-note">Вес остаётся стабильным</small></div>
+      </div>
+      <p class="warn" id="warn" hidden></p>
+
+      <div class="label">Распределение БЖУ</div>
+      <div class="macro-bar" id="mbar">
+        <div style="background:var(--c-low)"></div><div style="background:var(--c-over)"></div><div style="background:var(--c-ok)"></div>
+      </div>
+      <div class="macros">
+        <div style="--sw:var(--c-low)"><b>Белки</b><strong id="p">115 г</strong><small id="pk"></small></div>
+        <div style="--sw:var(--c-over)"><b>Жиры</b><strong id="fat">64 г</strong><small id="fk"></small></div>
+        <div style="--sw:var(--c-ok)"><b>Углеводы</b><strong id="c">220 г</strong><small id="ck"></small></div>
+      </div>
+    </section>
+  </div>
+
+  <p class="note">Расчёт ориентировочный и подходит для взрослых 18+. ИМТ не различает мышцы и жир, поэтому у спортсменов с большой мышечной массой он завышен; для беременных, кормящих и подростков нужны другие нормы. Белок считается из расчёта 1,6 г на кг веса (1,8 г при снижении), жиры — 30 % калорийности, остальное — углеводы. Перед резкой сменой питания посоветуйтесь с врачом.</p>
+</div>
+
+<script>
+(function(){
+  const $ = id => document.getElementById(id);
+  const fmt = (n, d=0) => n.toLocaleString('ru-RU',{minimumFractionDigits:d,maximumFractionDigits:d});
+  const MIN=15, MAX=42;
+  const CATS = [
+    {to:16,   name:'Выраженный дефицит', c:'--c-ob3'},
+    {to:18.5, name:'Недостаточный вес',  c:'--c-low'},
+    {to:25,   name:'Норма',              c:'--c-ok'},
+    {to:30,   name:'Избыточный вес',     c:'--c-over'},
+    {to:35,   name:'Ожирение I степени', c:'--c-ob1'},
+    {to:40,   name:'Ожирение II степени',c:'--c-ob2'},
+    {to:Infinity, name:'Ожирение III степени', c:'--c-ob3'}
+  ];
+  const pos = v => (Math.min(MAX,Math.max(MIN,v))-MIN)/(MAX-MIN)*100;
+
+  // build scale
+  let prev = MIN;
+  CATS.forEach(k=>{
+    const end = Math.min(k.to, MAX);
+    const d = document.createElement('div');
+    d.style.width = (end-prev)/(MAX-MIN)*100+'%';
+    d.style.background = `var(${k.c})`;
+    $('bar').appendChild(d); prev = end;
+  });
+  [16,18.5,25,30,35,40].forEach(t=>{
+    const s=document.createElement('span'); s.style.left=pos(t)+'%'; s.textContent=fmt(t, t%1?1:0); $('ticks').appendChild(s);
+  });
+  CATS.slice(1).forEach(k=>{
+    const s=document.createElement('span'); s.style.setProperty('--sw',`var(${k.c})`); s.textContent=k.name; $('legend').appendChild(s);
+  });
+
+  const form = $('form');
+  const KEY='bmi-kcal-v1';
+  try{
+    const saved = JSON.parse(localStorage.getItem(KEY)||'null');
+    if(saved){
+      ['age','height','weight'].forEach(k=>{ if(saved[k]) $(k).value=saved[k]; });
+      ['sex','act','goal'].forEach(k=>{ const el=form.querySelector(`input[name="${k}"][value="${saved[k]}"]`); if(el) el.checked=true; });
+    }
+  }catch(e){}
+
+  const LIMITS = {age:[18,100,'Возраст'],height:[120,230,'Рост'],weight:[30,300,'Вес']};
+
+  function calc(){
+    const v = {};
+    const errs=[];
+    for(const k in LIMITS){
+      const n = parseFloat(String($(k).value).replace(',','.'));
+      const [lo,hi,name]=LIMITS[k];
+      const bad = !(n>=lo && n<=hi);
+      $('f-'+k).classList.toggle('bad',bad);
+      if(bad) errs.push(`${name}: от ${lo} до ${hi}`);
+      v[k]=n;
+    }
+    const sex = form.sex.value, act = +form.act.value, goal = +form.goal.value;
+    $('err').hidden = !errs.length;
+    $('err').textContent = errs.length ? 'Проверьте значения. '+errs.join('; ')+'.' : '';
+    if(errs.length) return;
+
+    try{ localStorage.setItem(KEY, JSON.stringify({age:v.age,height:v.height,weight:v.weight,sex,act,goal})); }catch(e){}
+
+    const h = v.height/100;
+    const bmi = v.weight/(h*h);
+    const cat = CATS.find(k=>bmi<k.to);
+    $('bmi').textContent = fmt(bmi,1);
+    $('cat').textContent = cat.name;
+    $('cat').style.setProperty('--dot',`var(${cat.c})`);
+    $('marker').style.left = pos(bmi)+'%';
+
+    const lo = 18.5*h*h, hi = 24.9*h*h;
+    $('range').textContent = `${fmt(lo,1)}–${fmt(hi,1)} кг`;
+    let delta;
+    if(v.weight>hi) delta = `−${fmt(v.weight-hi,1)} кг`;
+    else if(v.weight<lo) delta = `+${fmt(lo-v.weight,1)} кг`;
+    else delta = 'Вы в норме';
+    $('delta').textContent = delta;
+
+    const bmr = 10*v.weight + 6.25*v.height - 5*v.age + (sex==='m'?5:-161);
+    const tdee = bmr*act;
+    let target = tdee*(1+goal);
+    const floor = sex==='m'?1500:1200;
+    const tooLow = goal<0 && target<floor;
+    if(tooLow) target = Math.max(target, Math.min(floor, tdee));
+
+    const r = n => Math.round(n/10)*10;
+    $('bmr').innerHTML = fmt(r(bmr))+'<em>ккал</em>';
+    $('tdee').innerHTML = fmt(r(tdee))+'<em>ккал</em>';
+    $('target').innerHTML = fmt(r(target))+'<em>ккал</em>';
+    $('target-note').textContent = goal<0 ? `Дефицит ${fmt(r(tdee-target))} ккал — около ${fmt((tdee-target)*7/7700,1)} кг в неделю`
+                               : goal>0 ? `Профицит ${fmt(r(target-tdee))} ккал для набора массы`
+                               : 'Вес остаётся стабильным';
+    $('warn').hidden = !tooLow;
+    $('warn').textContent = tooLow ? `Норма поднята до ${fmt(r(target))} ккал: опускаться ниже ${fmt(floor)} ккал в сутки без наблюдения врача не рекомендуется.` : '';
+    if(goal<0 && bmi<18.5){ $('warn').hidden=false; $('warn').textContent='При недостаточном весе снижать калорийность не стоит. Попробуйте цель «Поддержание» или «Набор».'; }
+
+    const pG = v.weight*(goal<0?1.8:1.6);
+    const fG = target*0.30/9;
+    const cG = Math.max(0,(target - pG*4 - fG*9)/4);
+    const tot = pG*4+fG*9+cG*4;
+    $('p').textContent = fmt(Math.round(pG))+' г';
+    $('fat').textContent = fmt(Math.round(fG))+' г';
+    $('c').textContent = fmt(Math.round(cG))+' г';
+    $('pk').textContent = `${fmt(Math.round(pG*4))} ккал · ${Math.round(pG*4/tot*100)} %`;
+    $('fk').textContent = `${fmt(Math.round(fG*9))} ккал · ${Math.round(fG*9/tot*100)} %`;
+    $('ck').textContent = `${fmt(Math.round(cG*4))} ккал · ${Math.round(cG*4/tot*100)} %`;
+    const m = $('mbar').children;
+    m[0].style.flexGrow = pG*4; m[1].style.flexGrow = fG*9; m[2].style.flexGrow = cG*4;
+  }
+
+  form.addEventListener('input', calc);
+  form.addEventListener('change', calc);
+  form.addEventListener('submit', e=>e.preventDefault());
+  calc();
+})();
+</script>
+</body>
+</html>

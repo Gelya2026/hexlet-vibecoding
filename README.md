@@ -3,9 +3,9 @@
 
 ## Эксперименты
 
-### [Калькулятор калорий](calorie-calculator/)
+### [Калькулятор калорий](docs/calorie-calculator/)
 
 Считает суточную норму калорий и БЖУ по формуле Миффлина — Сан Жеора с учётом пола, возраста, веса, роста, активности и цели (похудение / поддержание / набор массы), а также ИМТ.
 
-- Запуск: открыть `calorie-calculator/index.html` в браузере — сборка не нужна.
-- Тесты: `node --test calorie-calculator/`
+- Запуск: открыть `docs/calorie-calculator/index.html` в браузере — сборка не нужна.
+- Тесты: `node --test docs/calorie-calculator/calc.test.js`

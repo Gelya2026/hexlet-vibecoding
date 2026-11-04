@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Курс валют и погода в Москве</title>
+  <style>
+    :root {
+      --bg: #f4f6fb;
+      --card: #ffffff;
+      --text: #1d2433;
+      --muted: #6b7385;
+      --border: #e3e7ef;
+      --accent: #2f6fed;
+      --accent-hover: #2459c4;
+      --up: #1f9d55;
+      --down: #d64545;
+      --error-bg: #fdecec;
+      --error-text: #a12a2a;
+      --error-border: #f5c2c2;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #12151c;
+        --card: #1c212b;
+        --text: #e8ebf2;
+        --muted: #9aa3b5;
+        --border: #2c3340;
+        --accent: #5b8cff;
+        --accent-hover: #7aa2ff;
+        --up: #4cc38a;
+        --down: #ff7676;
+        --error-bg: #3a1f22;
+        --error-text: #ffb3b3;
+        --error-border: #5c2a2f;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      line-height: 1.4;
+    }
+    main {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 32px 16px 48px;
+    }
+    header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    h1 { margin: 0; font-size: 1.6rem; }
+    .subtitle { margin: 4px 0 0; color: var(--muted); font-size: 0.95rem; }
+    button {
+      font: inherit;
+      font-weight: 600;
+      padding: 10px 20px;
+      border: 0;
+      border-radius: 10px;
+      background: var(--accent);
+      color: #fff;
+      cursor: pointer;
+    }
+    button:hover { background: var(--accent-hover); }
+    button:disabled { opacity: 0.6; cursor: progress; }
+    .errors { display: grid; gap: 8px; margin-bottom: 16px; }
+    .error {
+      padding: 12px 16px;
+      border-radius: 10px;
+      background: var(--error-bg);
+      color: var(--error-text);
+      border: 1px solid var(--error-border);
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 20px;
+      min-height: 140px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .label { color: var(--muted); font-size: 0.9rem; }
+    .value {
+      font-size: 2rem;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+    }
+    .value.small { font-size: 1.3rem; }
+    .note { color: var(--muted); font-size: 0.85rem; }
+    .up { color: var(--up); }
+    .down { color: var(--down); }
+    .loading .value { color: var(--muted); }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div>
+        <h1>Курс валют и погода в Москве</h1>
+        <p class="subtitle">Данные: ЦБ РФ (cbr-xml-daily.ru) и Open-Meteo</p>
+      </div>
+      <button id="refresh" type="button">Обновить</button>
+    </header>
+
+    <div id="errors" class="errors" role="alert" aria-live="polite"></div>
+
+    <section class="grid">
+      <article class="card" id="card-usd">
+        <span class="label">Доллар США (USD)</span>
+        <span class="value" id="usd-value">—</span>
+        <span class="note" id="usd-note"></span>
+      </article>
+      <article class="card" id="card-eur">
+        <span class="label">Евро (EUR)</span>
+        <span class="value" id="eur-value">—</span>
+        <span class="note" id="eur-note"></span>
+      </article>
+      <article class="card" id="card-temp">
+        <span class="label">Температура</span>
+        <span class="value" id="temp-value">—</span>
+        <span class="note" id="temp-note"></span>
+      </article>
+      <article class="card" id="card-precip">
+        <span class="label">Осадки</span>
+        <span class="value" id="precip-value">—</span>
+        <span class="note" id="precip-note"></span>
+      </article>
+      <article class="card" id="card-updated">
+        <span class="label">Время обновления</span>
+        <span class="value small" id="updated-value">—</span>
+        <span class="note" id="updated-note"></span>
+      </article>
+    </section>
+  </main>
+
+  <script>
+    const CBR_URL = 'https://www.cbr-xml-daily.ru/daily_json.js';
+    // Москва: 55.7558 с. ш., 37.6173 в. д.
+    const WEATHER_URL = 'https://api.open-meteo.com/v1/forecast'
+      + '?latitude=55.7558&longitude=37.6173'
+      + '&current=temperature_2m,apparent_temperature,precipitation,weather_code'
+      + '&timezone=Europe%2FMoscow';
+    const TIMEOUT_MS = 10000;
+
+    const WEATHER_CODES = {
+      0: 'Ясно', 1: 'Преимущественно ясно', 2: 'Переменная облачность', 3: 'Пасмурно',
+      45: 'Туман', 48: 'Изморозь, туман',
+      51: 'Слабая морось', 53: 'Морось', 55: 'Сильная морось',
+      56: 'Ледяная морось', 57: 'Сильная ледяная морось',
+      61: 'Небольшой дождь', 63: 'Дождь', 65: 'Сильный дождь',
+      66: 'Ледяной дождь', 67: 'Сильный ледяной дождь',
+      71: 'Небольшой снег', 73: 'Снег', 75: 'Сильный снег', 77: 'Снежная крупа',
+      80: 'Небольшой ливень', 81: 'Ливень', 82: 'Сильный ливень',
+      85: 'Снегопад', 86: 'Сильный снегопад',
+      95: 'Гроза', 96: 'Гроза с градом', 99: 'Сильная гроза с градом'
+    };
+
+    const $ = (id) => document.getElementById(id);
+    const rub = new Intl.NumberFormat('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const num1 = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 1 });
+    const dateTime = new Intl.DateTimeFormat('ru-RU', {
+      day: '2-digit', month: '2-digit', year: 'numeric',
+      hour: '2-digit', minute: '2-digit', second: '2-digit',
+      timeZone: 'Europe/Moscow'
+    });
+
+    async function fetchJson(url) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+      try {
+        const response = await fetch(url, { signal: controller.signal, cache: 'no-store' });
+        if (!response.ok) {
+          throw new Error(`сервер вернул ошибку ${response.status}`);
+        }
+        return await response.json();
+      } catch (err) {
+        if (err.name === 'AbortError') {
+          throw new Error(`нет ответа за ${TIMEOUT_MS / 1000} секунд`);
+        }
+        if (err instanceof TypeError) {
+          throw new Error('не удалось подключиться (нет сети или сервис недоступен)');
+        }
+        throw err;
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+
+    function showError(message) {
+      const div = document.createElement('div');
+      div.className = 'error';
+      div.textContent = message;
+      $('errors').appendChild(div);
+    }
+
+    function setCurrency(code, valute) {
+      const key = code.toLowerCase();
+      if (!valute || typeof valute.Value !== 'number') {
+        throw new Error(`в ответе нет курса ${code}`);
+      }
+      const value = valute.Value / valute.Nominal;
+      const prev = valute.Previous / valute.Nominal;
+      const diff = value - prev;
+      $(`${key}-value`).textContent = `${rub.format(value)} ₽`;
+      const note = $(`${key}-note`);
+      const sign = diff > 0 ? '+' : diff < 0 ? '−' : '';
+      note.textContent = `${sign}${rub.format(Math.abs(diff))} ₽ к прошлому курсу`;
+      note.className = 'note ' + (diff > 0 ? 'up' : diff < 0 ? 'down' : '');
+    }
+
+    function resetCurrency(code) {
+      const key = code.toLowerCase();
+      $(`${key}-value`).textContent = 'нет данных';
+      $(`${key}-note`).textContent = '';
+      $(`${key}-note`).className = 'note';
+    }
+
+    async function loadRates() {
+      try {
+        const data = await fetchJson(CBR_URL);
+        if (!data || !data.Valute) throw new Error('неожиданный формат ответа');
+        setCurrency('USD', data.Valute.USD);
+        setCurrency('EUR', data.Valute.EUR);
+        return data.Date ? new Date(data.Date) : null;
+      } catch (err) {
+        resetCurrency('USD');
+        resetCurrency('EUR');
+        showError(`Не удалось загрузить курс валют ЦБ РФ: ${err.message}. Попробуйте нажать «Обновить» позже.`);
+        return null;
+      }
+    }
+
+    async function loadWeather() {
+      try {
+        const data = await fetchJson(WEATHER_URL);
+        const current = data && data.current;
+        if (!current || typeof current.temperature_2m !== 'number') {
+          throw new Error('неожиданный формат ответа');
+        }
+        const t = current.temperature_2m;
+        $('temp-value').textContent = `${t > 0 ? '+' : ''}${num1.format(t)} °C`;
+        const parts = [];
+        if (WEATHER_CODES[current.weather_code]) parts.push(WEATHER_CODES[current.weather_code]);
+        if (typeof current.apparent_temperature === 'number') {
+          const a = current.apparent_temperature;
+          parts.push(`ощущается как ${a > 0 ? '+' : ''}${num1.format(a)} °C`);
+        }
+        $('temp-note').textContent = parts.join(', ');
+
+        const p = current.precipitation;
+        $('precip-value').textContent = `${num1.format(p)} мм`;
+        $('precip-note').textContent = p > 0 ? 'Сейчас идут осадки' : 'Без осадков';
+        return true;
+      } catch (err) {
+        $('temp-value').textContent = 'нет данных';
+        $('temp-note').textContent = '';
+        $('precip-value').textContent = 'нет данных';
+        $('precip-note').textContent = '';
+        showError(`Не удалось загрузить погоду Open-Meteo: ${err.message}. Попробуйте нажать «Обновить» позже.`);
+        return false;
+      }
+    }
+
+    async function refresh() {
+      const button = $('refresh');
+      button.disabled = true;
+      button.textContent = 'Загрузка…';
+      $('errors').replaceChildren();
+      document.querySelectorAll('.card').forEach((c) => c.classList.add('loading'));
+
+      const [ratesDate] = await Promise.all([loadRates(), loadWeather()]);
+
+      $('updated-value').textContent = dateTime.format(new Date());
+      $('updated-note').textContent = ratesDate
+        ? `Курс ЦБ установлен на ${ratesDate.toLocaleDateString('ru-RU', { timeZone: 'Europe/Moscow' })}`
+        : 'Время по Москве';
+
+      document.querySelectorAll('.card').forEach((c) => c.classList.remove('loading'));
+      button.disabled = false;
+      button.textContent = 'Обновить';
+    }
+
+    $('refresh').addEventListener('click', refresh);
+    refresh();
+  </script>
+</body>
+</html>

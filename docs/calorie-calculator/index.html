@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Калькулятор калорий</title>
+  <style>
+    :root {
+      --bg: #f6f7f9;
+      --card: #ffffff;
+      --text: #1d2330;
+      --muted: #667085;
+      --border: #d8dce3;
+      --accent: #2f8f5b;
+      --accent-soft: #e5f4ec;
+      --error: #c2410c;
+      --protein: #3b82f6;
+      --fat: #f59e0b;
+      --carbs: #10b981;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #12151b;
+        --card: #1b2029;
+        --text: #e8ebf0;
+        --muted: #98a2b3;
+        --border: #2e3542;
+        --accent: #4cc285;
+        --accent-soft: #1d3329;
+        --error: #fb923c;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    }
+    main { max-width: 760px; margin: 0 auto; padding: 32px 16px; }
+    h1 { margin: 0 0 4px; font-size: 28px; }
+    .subtitle { margin: 0 0 24px; color: var(--muted); }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 16px; }
+    label, legend { display: block; font-weight: 600; font-size: 14px; margin-bottom: 6px; }
+    fieldset { border: 0; padding: 0; margin: 0; }
+    input[type=number], select {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--bg);
+      color: var(--text);
+      font: inherit;
+    }
+    input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+    .segmented { display: flex; gap: 8px; flex-wrap: wrap; }
+    .segmented label {
+      flex: 1;
+      margin: 0;
+      font-weight: 500;
+      text-align: center;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .segmented input { position: absolute; opacity: 0; pointer-events: none; }
+    .segmented input:checked + span { color: var(--accent); }
+    .segmented label:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
+    .segmented label:has(input:focus-visible) { outline: 2px solid var(--accent); }
+    .row { margin-top: 16px; }
+    button {
+      margin-top: 20px;
+      width: 100%;
+      padding: 12px;
+      border: 0;
+      border-radius: 10px;
+      background: var(--accent);
+      color: #fff;
+      font: inherit;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    button:hover { filter: brightness(1.05); }
+    .errors { color: var(--error); margin: 12px 0 0; padding-left: 20px; }
+    .result[hidden] { display: none; }
+    .target { text-align: center; }
+    .target .value { font-size: 48px; font-weight: 700; color: var(--accent); line-height: 1.1; }
+    .target .caption { color: var(--muted); }
+    .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-top: 16px; }
+    .stat { background: var(--bg); border-radius: 10px; padding: 12px; }
+    .stat .name { font-size: 13px; color: var(--muted); }
+    .stat .num { font-size: 22px; font-weight: 700; }
+    .bar { display: flex; height: 12px; border-radius: 6px; overflow: hidden; margin: 16px 0 12px; }
+    .bar div { height: 100%; }
+    .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; }
+    .note { color: var(--muted); font-size: 13px; margin: 0; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Калькулятор калорий</h1>
+  <p class="subtitle">Суточная норма калорий и БЖУ по формуле Миффлина — Сан Жеора</p>
+
+  <form id="form" class="card" novalidate>
+    <fieldset>
+      <legend>Пол</legend>
+      <div class="segmented">
+        <label><input type="radio" name="sex" value="female" checked><span>Женский</span></label>
+        <label><input type="radio" name="sex" value="male"><span>Мужской</span></label>
+      </div>
+    </fieldset>
+
+    <div class="grid row">
+      <div>
+        <label for="age">Возраст, лет</label>
+        <input id="age" name="age" type="number" inputmode="numeric" min="14" max="100" placeholder="30">
+      </div>
+      <div>
+        <label for="weight">Вес, кг</label>
+        <input id="weight" name="weight" type="number" inputmode="decimal" min="30" max="300" step="0.1" placeholder="65">
+      </div>
+      <div>
+        <label for="height">Рост, см</label>
+        <input id="height" name="height" type="number" inputmode="numeric" min="100" max="250" placeholder="170">
+      </div>
+    </div>
+
+    <div class="row">
+      <label for="activity">Физическая активность</label>
+      <select id="activity" name="activity"></select>
+    </div>
+
+    <fieldset class="row">
+      <legend>Цель</legend>
+      <div class="segmented" id="goals"></div>
+    </fieldset>
+
+    <ul class="errors" id="errors" hidden></ul>
+    <button type="submit">Рассчитать</button>
+  </form>
+
+  <section class="result" id="result" hidden aria-live="polite">
+    <div class="card target">
+      <div class="caption">Ваша суточная норма</div>
+      <div class="value"><span id="target"></span> ккал</div>
+      <div class="caption" id="goal-caption"></div>
+
+      <div class="stats">
+        <div class="stat"><div class="name">Базовый обмен (BMR)</div><div class="num"><span id="bmr"></span> ккал</div></div>
+        <div class="stat"><div class="name">Расход с активностью</div><div class="num"><span id="tdee"></span> ккал</div></div>
+        <div class="stat"><div class="name">Индекс массы тела</div><div class="num" id="bmi"></div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <strong>Белки, жиры, углеводы</strong>
+      <div class="bar" id="bar"></div>
+      <div class="stats" id="macros"></div>
+    </div>
+
+    <p class="note">Расчёт ориентировочный и не заменяет консультацию врача или диетолога.</p>
+  </section>
+</main>
+
+<script src="calc.js"></script>
+<script>
+  const { ACTIVITY_LEVELS, GOALS, MACRO_SPLIT, calculate } = window.CalorieCalc;
+  const $ = (id) => document.getElementById(id);
+  const fmt = (n) => n.toLocaleString('ru-RU');
+
+  // Заполняем выпадающий список и цели
+  for (const [value, { label }] of Object.entries(ACTIVITY_LEVELS)) {
+    $('activity').add(new Option(label, value, false, value === 'light'));
+  }
+  $('goals').innerHTML = Object.entries(GOALS).map(([value, { label }]) =>
+    `<label><input type="radio" name="goal" value="${value}"${value === 'maintain' ? ' checked' : ''}><span>${label}</span></label>`
+  ).join('');
+
+  const MACRO_INFO = {
+    protein: { label: 'Белки', color: 'var(--protein)' },
+    fat: { label: 'Жиры', color: 'var(--fat)' },
+    carbs: { label: 'Углеводы', color: 'var(--carbs)' },
+  };
+
+  function readForm() {
+    const data = new FormData($('form'));
+    return {
+      sex: data.get('sex'),
+      age: parseFloat(data.get('age')),
+      weight: parseFloat(String(data.get('weight')).replace(',', '.')),
+      height: parseFloat(data.get('height')),
+      activity: data.get('activity'),
+      goal: data.get('goal'),
+    };
+  }
+
+  function render(input, r) {
+    $('target').textContent = fmt(r.target);
+    $('bmr').textContent = fmt(r.bmr);
+    $('tdee').textContent = fmt(r.tdee);
+    $('bmi').textContent = `${String(r.bmi).replace('.', ',')} · ${r.bmiCategory}`;
+    const delta = r.target - r.tdee;
+    $('goal-caption').textContent = delta === 0
+      ? 'для поддержания текущего веса'
+      : `${GOALS[input.goal].label.toLowerCase()}: ${delta > 0 ? '+' : '−'}${fmt(Math.abs(delta))} ккал к расходу`;
+
+    const split = MACRO_SPLIT[input.goal];
+    $('bar').innerHTML = Object.keys(split).map((k) =>
+      `<div style="width:${split[k] * 100}%;background:${MACRO_INFO[k].color}" title="${MACRO_INFO[k].label}"></div>`
+    ).join('');
+    $('macros').innerHTML = Object.keys(split).map((k) => `
+      <div class="stat">
+        <div class="name"><span class="dot" style="background:${MACRO_INFO[k].color}"></span>${MACRO_INFO[k].label} · ${Math.round(split[k] * 100)}%</div>
+        <div class="num">${fmt(r.macros[k])} г</div>
+      </div>`).join('');
+
+    $('result').hidden = false;
+  }
+
+  $('form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const input = readForm();
+    const r = calculate(input);
+    const errors = $('errors');
+    if (!r.ok) {
+      errors.innerHTML = r.errors.map((msg) => `<li>${msg}</li>`).join('');
+      errors.hidden = false;
+      $('result').hidden = true;
+      return;
+    }
+    errors.hidden = true;
+    render(input, r);
+    $('result').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+</script>
+</body>
+</html>

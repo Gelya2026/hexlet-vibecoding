@@ -18,6 +18,8 @@
       --error-bg: #fdecec;
       --error-text: #a12a2a;
       --error-border: #f5c2c2;
+      --chip-bg: #e8effd;
+      --chip-text: #2459c4;
     }
     @media (prefers-color-scheme: dark) {
       :root {
@@ -33,6 +35,8 @@
         --error-bg: #3a1f22;
         --error-text: #ffb3b3;
         --error-border: #5c2a2f;
+        --chip-bg: #24314d;
+        --chip-text: #9dbaff;
       }
     }
     * { box-sizing: border-box; }
@@ -103,7 +107,52 @@
     .note { color: var(--muted); font-size: 0.85rem; }
     .up { color: var(--up); }
     .down { color: var(--down); }
-    .loading .value { color: var(--muted); }
+    .card-head {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 6px;
+    }
+    .source {
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: var(--chip-bg);
+      color: var(--chip-text);
+      white-space: nowrap;
+    }
+    .card.loading .value,
+    .card.loading .note {
+      color: var(--muted);
+      animation: pulse 1.2s ease-in-out infinite;
+    }
+    .card.loading .value { font-size: 1.3rem; font-weight: 600; }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+    .spinner {
+      display: inline-block;
+      width: 14px;
+      height: 14px;
+      margin-right: 8px;
+      vertical-align: -2px;
+      border: 2px solid rgba(255, 255, 255, 0.4);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @media (prefers-reduced-motion: reduce) {
+      .card.loading .value, .card.loading .note, .spinner { animation: none; }
+    }
+    .footnote {
+      margin: 20px 0 0;
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
   </style>
 </head>
 <body>
@@ -118,24 +167,36 @@
 
     <div id="errors" class="errors" role="alert" aria-live="polite"></div>
 
-    <section class="grid">
+    <section class="grid" id="cards" aria-busy="false">
       <article class="card" id="card-usd">
-        <span class="label">Доллар США (USD)</span>
+        <div class="card-head">
+          <span class="label">Доллар США (USD)</span>
+          <span class="source">курс ЦБ</span>
+        </div>
         <span class="value" id="usd-value">—</span>
         <span class="note" id="usd-note"></span>
       </article>
       <article class="card" id="card-eur">
-        <span class="label">Евро (EUR)</span>
+        <div class="card-head">
+          <span class="label">Евро (EUR)</span>
+          <span class="source">курс ЦБ</span>
+        </div>
         <span class="value" id="eur-value">—</span>
         <span class="note" id="eur-note"></span>
       </article>
       <article class="card" id="card-temp">
-        <span class="label">Температура</span>
+        <div class="card-head">
+          <span class="label">Температура</span>
+          <span class="source">погода Open-Meteo</span>
+        </div>
         <span class="value" id="temp-value">—</span>
         <span class="note" id="temp-note"></span>
       </article>
       <article class="card" id="card-precip">
-        <span class="label">Осадки</span>
+        <div class="card-head">
+          <span class="label">Осадки</span>
+          <span class="source">погода Open-Meteo</span>
+        </div>
         <span class="value" id="precip-value">—</span>
         <span class="note" id="precip-note"></span>
       </article>
@@ -145,6 +206,8 @@
         <span class="note" id="updated-note"></span>
       </article>
     </section>
+
+    <p class="footnote">Данные получены из внешних API</p>
   </main>
 
   <script>
@@ -278,9 +341,16 @@
     async function refresh() {
       const button = $('refresh');
       button.disabled = true;
-      button.textContent = 'Загрузка…';
+      button.innerHTML = '<span class="spinner" aria-hidden="true"></span>Загрузка…';
       $('errors').replaceChildren();
-      document.querySelectorAll('.card').forEach((c) => c.classList.add('loading'));
+      $('cards').setAttribute('aria-busy', 'true');
+      document.querySelectorAll('.card').forEach((c) => {
+        c.classList.add('loading');
+        c.querySelector('.value').textContent = 'Загрузка…';
+        const note = c.querySelector('.note');
+        note.textContent = '';
+        note.className = 'note';
+      });
 
       const [ratesDate] = await Promise.all([loadRates(), loadWeather()]);
 
@@ -290,6 +360,7 @@
         : 'Время по Москве';
 
       document.querySelectorAll('.card').forEach((c) => c.classList.remove('loading'));
+      $('cards').setAttribute('aria-busy', 'false');
       button.disabled = false;
       button.textContent = 'Обновить';
     }
